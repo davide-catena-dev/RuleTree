@@ -6,3 +6,5 @@ from .PivotTreeStumpClassifier import PivotTreeStumpClassifier
 #from .ProximityTreeStumpClassifier import ProximityTreeStumpClassifier
 from .ShapeletTreeStumpClassifier import ShapeletTreeStumpClassifier
 from .PartialPivotTreeStumpClassifier import PartialPivotTreeStumpClassifier
+from .TrepanStumpClassifier import TrepanStumpClassifier
+from .MofNTrepanStumpClassifier import MofNTrepanStumpClassifier

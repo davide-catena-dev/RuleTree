@@ -17,10 +17,10 @@ from typing import Optional
 
 import numpy as np
 import sklearn
-try:
-    from line_profiler_pycharm import profile
-except ModuleNotFoundError:
-    profile = None
+#try:
+    #from c import profile
+#except ModuleNotFoundError:
+    #profile = None
 from sklearn import tree
 from sklearn.metrics import pairwise_distances
 from tempfile312 import TemporaryDirectory
@@ -658,38 +658,41 @@ class RuleTree(RuleTreeBase, ABC):
 
         Args:
             current_node (RuleTreeNode): Current node in the tree.
-            importances (dict): Array to store importances.
+            importances (dict): Dictionary to store importances.
 
         Returns:
-            dict: Feature importances.
+            dict: Feature importances keyed by feature index.
         """
+        from collections import defaultdict
+
         if importances is None:
-            importances = dict()
+            importances = defaultdict(float)
 
         if current_node is None:
             current_node = self.root
 
         if not current_node.is_leaf():
-            #following the implementation of https://github.com/scikit-learn/scikit-learn/blob/main/sklearn/tree/_tree.pyx#L1251
+            # following the implementation of https://github.com/scikit-learn/scikit-learn/blob/main/sklearn/tree/_tree.pyx#L1251
             feature = current_node.stump.feature_original[0]
-           
+
             imp_parent, imp_child_l, imp_child_r = current_node.stump.tree_.impurity
             n_parent, n_child_l, n_child_r = current_node.stump.tree_.weighted_n_node_samples
-           
+
             info_gain = (
                 n_parent * imp_parent
                 - n_child_l * imp_child_l
                 - n_child_r * imp_child_r
             )
 
-            importances[feature] += info_gain
+            if feature >= 0:
+                importances[feature] += info_gain
 
             # Recur for left and right children
             self._compute_importances(current_node.node_l, importances)
             self._compute_importances(current_node.node_r, importances)
 
         return importances 
-   
+    
     def compute_feature_importances(self, normalize=True):
         """
         Compute feature importances based on information gain.
@@ -701,13 +704,27 @@ class RuleTree(RuleTreeBase, ABC):
             np.ndarray: Array of feature importances.
         """
         importances = self._compute_importances()
+
+        if isinstance(importances, dict):
+            if importances:
+                max_feature = max(importances.keys())
+                n_features = max_feature + 1
+            else:
+                n_features = 0
+            importances_array = np.zeros(n_features, dtype=float)
+            for feature, value in importances.items():
+                if feature >= 0:
+                    importances_array[feature] = value
+            importances = importances_array
+
         root_weighted_samples = self.root.stump.tree_.weighted_n_node_samples[0]
-        importances /= root_weighted_samples
-        
+        if root_weighted_samples != 0:
+            importances = importances / float(root_weighted_samples)
+
         if normalize:
             total = np.sum(importances)
             if total > 0.0:
-                importances /= total
+                importances = importances / total
 
         return importances
         
