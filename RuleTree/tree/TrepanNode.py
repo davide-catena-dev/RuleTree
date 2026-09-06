@@ -1,6 +1,7 @@
 from typing import Optional, Iterable, Union
 import numpy as np
 from RuleTree.tree.RuleTreeNode import RuleTreeNode
+import copy
 
 class Constraint:
     """
@@ -49,7 +50,6 @@ class Constraint:
 class TrepanNode(RuleTreeNode):
     """
     Nodo specializzato per Trepan.
-    Oltre a reach/fidelity, tiene anche i constraints che definiscono il sottospazio.
     """
 
     def __init__(
@@ -64,7 +64,9 @@ class TrepanNode(RuleTreeNode):
         fidelity: float = 0.0,
         constraints: Optional[Iterable[Constraint]] = None,
         m_of_n_rules: Optional[list] = None,
+        is_statistically_pure: int=False,
         **kwargs
+        
     ):
         super().__init__(
             node_id=node_id,
@@ -87,6 +89,7 @@ class TrepanNode(RuleTreeNode):
         # Copia difensiva: così un figlio non modifica accidentalmente la lista del padre
         self.constraints = list(constraints) if constraints is not None else []
         self.m_of_n_rules = list(m_of_n_rules) if m_of_n_rules is not None else []
+        self.is_statistically_pure = bool(is_statistically_pure)
 
     def priority(self) -> float:
         """Priorità TREPAN: più reach, meno fidelity => più priorità."""
@@ -126,6 +129,10 @@ class TrepanNode(RuleTreeNode):
     
    
     def satisfies_m_of_n_rules(self, sample: np.ndarray) -> bool:
+        """
+        Verifica se un campione rispetta tutte le regole M-of-N storiche 
+        ereditate dai nodi antenati lungo il percorso.
+        """
         for m, conditions, is_left in self.m_of_n_rules:
             satisfied_count = 0
             for feat_idx, thresh, op in conditions:
@@ -158,17 +165,19 @@ class TrepanNode(RuleTreeNode):
             f"priority={self.priority():.6f}, "
             f"reach={self.reach:.6f}, "
             f"fidelity={self.fidelity:.6f}, "
-            f"constraints={self.constraints!r})"
+            f"constraints={self.constraints!r}, "
+            f"m_of_n_rules={self.m_of_n_rules!r})"
         )
         
         
     def make_child(self, new_constraint: Constraint) -> "TrepanNode":
 
         """
-        Restituisce un nuovo nodo figlio con una nuova lista di constraints per un figlio, estendendo quelli del nodo corrente.
+        Restituisce un nuovo nodo figlio
         """
         new_constraints = self.copy_constraints()
         new_constraints.append(new_constraint)
+        child_m_of_n_rules = copy.deepcopy(getattr(self, 'm_of_n_rules', []))
         
         return TrepanNode(
             node_id=f"{self.node_id}_child",
@@ -179,6 +188,7 @@ class TrepanNode(RuleTreeNode):
             parent=self,
             reach=self.reach,  # Il reach del figlio può essere calcolato successivamente
             fidelity=self.fidelity,  # La fidelity del figlio può essere calcolata successivamente
-            constraints=new_constraints
+            constraints=new_constraints,
+            m_of_n_rules=child_m_of_n_rules
         )
     

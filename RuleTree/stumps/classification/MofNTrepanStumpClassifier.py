@@ -1,12 +1,11 @@
 import numpy as np
-import copy
-from scipy.stats import gaussian_kde
 from sklearn.utils import check_random_state
 from RuleTree.exceptions import NoSplitFoundWarning
-from RuleTree.stumps.classification.TrepanStumpClassifier import TrepanStumpClassifier
+from RuleTree.stumps.classification.DecisionTreeStumpClassifier import DecisionTreeStumpClassifier 
+from RuleTree.utils.synthetic_data import SyntheticDataGenerator
 
-class MofNTrepanStumpClassifier(TrepanStumpClassifier):
-    def __init__(self, max_conditions=3, **kwargs):
+class MofNTrepanStumpClassifier(DecisionTreeStumpClassifier):
+    def __init__(self, max_conditions=3, categorical_threshold=10, **kwargs):
         super().__init__(**kwargs)
         self.max_conditions = max_conditions
         self.m = 1
@@ -14,7 +13,7 @@ class MofNTrepanStumpClassifier(TrepanStumpClassifier):
         self.is_categorical = False
         self.left_class = None
         self.right_class = None
-        
+        self.categorical_threshold = categorical_threshold
 
     def _apply_condition(self, X: np.ndarray, cond: tuple) -> np.ndarray:
         """Helper vettorizzato per valutare una singola condizione su tutti i campioni."""
@@ -38,21 +37,20 @@ class MofNTrepanStumpClassifier(TrepanStumpClassifier):
         # 1. CREAZIONE CHIAVE DI CACHE
         cache_key = (m, frozenset(conditions))
         
-        # Se abbiamo già calcolato questo set di condizioni per questo nodo, restituiscilo!
+        # Se ha già calcolato questo set di condizioni per questo nodo, lo restituisce
         if hasattr(self, '_eval_cache') and cache_key in self._eval_cache:
             return self._eval_cache[cache_key]
 
-        # VETTORIZZAZIONE: Creiamo una matrice (n_samples, n_conditions) e sommiamo in asse 1
+        # VETTORIZZAZIONE: Crea una matrice (n_samples, n_conditions) e somma in asse 1
         masks = np.column_stack([self._apply_condition(X, cond) for cond in conditions])
         satisfied_counts = np.sum(masks, axis=1)
         
         left_mask = satisfied_counts >= m
         right_mask = ~left_mask
         
-        # Uscita anticipata per tagli inutili
+        # Uscita anticipata standard solo se un ramo è completamente vuoto (evita divisioni per zero o entropie non calcolabili)
         if not np.any(left_mask) or not np.any(right_mask):
             result = (float('inf'), left_mask, right_mask)
-            # SALVATAGGIO IN CACHE (Anche per i casi pessimi)
             if hasattr(self, '_eval_cache'):
                 self._eval_cache[cache_key] = result
             return result
@@ -63,7 +61,7 @@ class MofNTrepanStumpClassifier(TrepanStumpClassifier):
             if total_weight == 0: 
                 return 0.0
             
-            # Estrazione classi e probabilità in modo array-based
+            # Estrazione classi e probabilità 
             classes = np.unique(y[mask])
             probs = np.array([np.sum(mask_weights[y[mask] == c]) for c in classes]) / total_weight
             
@@ -87,7 +85,7 @@ class MofNTrepanStumpClassifier(TrepanStumpClassifier):
         
         gain_ratio = (ig / split_info) if split_info > 1e-9 else 0.0
         
-        # Prepariamo il risultato finale
+        # Risultato finale
         result = (-gain_ratio, left_mask, right_mask)
         
         # SALVATAGGIO IN CACHE (Prima di restituirlo)
@@ -97,105 +95,129 @@ class MofNTrepanStumpClassifier(TrepanStumpClassifier):
         return result
 
         
-
     def fit(self, X=None, y=None, X_ts=None, X_img=None, X_txt=None,
             idx=None, context=None, sample_weight=None, check_input=True):
         
-        if X is None or y is None: return self
+        if X is None or y is None:
+            return self
+            
         seed = getattr(context, 'random_state', getattr(self, 'random_state', None))
         rng = check_random_state(seed)
-        if idx is None: idx = slice(None)
         
+        if idx is None:
+            idx = slice(None)
+            
         self._eval_cache = {}
             
         X_local = X[idx]
         y_local = y[idx]
-        
-        # EARLY EXIT: Se non ci sono dati, non tentiamo lo split
+
+        # EARLY EXIT: se non ci sono dati reali, blocca
         if len(X_local) == 0:
-            raise NoSplitFoundWarning("Nessun dato disponibile per lo split.")
+            raise NoSplitFoundWarning("Nessun dato reale disponibile. Spazio collassato e irraggiungibile dai dati originali.")
 
         # 1. ORACLE E ETICHETTATURA LOCALE
         if context is not None and hasattr(context, 'oracle'):
-            try: y_labels = np.asarray(context.oracle.predict(X_local)).ravel()
-            except Exception: y_labels = y_local
+            try:
+                y_labels = np.asarray(context.oracle.predict(X_local)).ravel()
+            except Exception:
+                y_labels = y_local
         else:
             y_labels = y_local
             
         S_MIN = getattr(context, 's_min', 1000)
-        
-        # 2. GENERAZIONE DATI SINTETICI (Tramite il generatore centralizzato)
+
+        # 2. GENERAZIONE DATI SINTETICI (locale puro)
+        X_extended = X_local.copy()
+        y_labels_extended = y_labels.copy()
+
         if context is not None and hasattr(context, '_current_node') and 0 < len(X_local) < S_MIN:
             n_synth = S_MIN - len(X_local)
-            
             constraints = getattr(context._current_node, 'constraints', [])
             m_of_n_rules = getattr(context._current_node, 'm_of_n_rules', [])
-            generator = getattr(context, '_synth_gen', None)
             
-            if generator is not None:
-                # Generazione in una singola riga!
-                X_synth = generator.sample_constrained(n_synth, constraints, m_of_n_rules)
-                
-                # Prevenzione Array Vuoto: Interroghiamo l'oracolo solo se ci sono dati validi
-                if len(X_synth) > 0:
-                    y_synth = np.asarray(context.oracle.predict(X_synth)).ravel()
-                    X_local = np.vstack((X_local, X_synth))
-                    y_labels = np.concatenate((y_labels, y_synth))
-                else:
-                    import warnings
-                    warnings.warn("Nessun campione sintetico generato per il nodo. Uso solo dati reali.")
+            # Generatore locale con seed casuale
+            local_generator = SyntheticDataGenerator(X_local, random_state=rng.randint(0, 100000), categorical_features=getattr(context, 'categorical', None))
+            
+            X_synth = np.empty((0, X_local.shape[1]))
+            
+            # Il loop ora continua finché non viene raggiunto rigorosamente S_min (tramite n_synth)
+            while len(X_synth) < n_synth:
+                X_synth_batch = local_generator.sample_constrained(n_synth, constraints, m_of_n_rules)
+                if len(X_synth_batch) > 0:
+                    X_synth = np.vstack((X_synth, X_synth_batch))
+            
+            if len(X_synth) > n_synth:
+                X_synth = X_synth[:n_synth]
+            y_synth = np.asarray(context.oracle.predict(X_synth)).ravel()
+            X_extended = np.vstack((X_local, X_synth))
+            y_labels_extended = np.concatenate((y_labels, y_synth))
+        
+        if np.unique(y_labels_extended).size <= 1:
+            raise NoSplitFoundWarning(f"Nodo puro: impossibile splittare su y {np.unique(y_labels_extended)}")
 
-        if np.unique(y_labels).size <= 1:
-            raise NoSplitFoundWarning(f"Nodo puro: impossibile splittare su y {np.unique(y_labels)}")
-
-        weights_og = sample_weight[idx] if sample_weight is not None else None
+        weights_og = sample_weight
         if weights_og is not None:
-            n_synth = len(y_labels) - len(weights_og)
-            if n_synth > 0:
-                weights_og = np.concatenate((weights_og, np.ones(n_synth) * np.mean(weights_og)))
+            n_synth_weights = len(y_labels_extended) - len(weights_og)
+            if n_synth_weights > 0:
+                weights_og = np.concatenate((weights_og, np.ones(n_synth_weights) * np.mean(weights_og)))
             local_weights = weights_og
         else:
-            local_weights = np.ones(len(y_labels))
+            local_weights = np.ones(len(y_labels_extended))
 
-        # 3. RICERCA DEL SEME
-        n_samples, n_features = X_local.shape
+       # 3. SELEZIONE DEL SEED (split binario - TUTTE le feature sono ammesse)
+        n_samples, n_features = X_extended.shape
         best_seed_score = float('inf')
         best_seed = None
-        
+
+        # set creato per inserire feature proibite per split con m>1 e n>1
+        forbidden_in_mofn = set()
+        if context is not None and hasattr(context, '_current_node') and context._current_node is not None:
+            for m_rule, conds, is_left in getattr(context._current_node, 'm_of_n_rules', []):
+                if len(conds) > 1: # Solo se era un VERO split disgiuntivo!
+                    for f_idx, _thresh, _op in conds:
+                        forbidden_in_mofn.add(f_idx)
+
         for feat_idx in range(n_features):
+            # il seed iniziale può essere qualsiasi feature (non blocchiamo quelle in forbidden_in_mofn)
             uniq_vals = np.unique(X_local[:, feat_idx])
-            is_categorical = len(uniq_vals) <= 10  
+            is_categorical = self._is_feature_categorical(feat_idx, X_local, context)
             
             if is_categorical:
                 thresholds = uniq_vals
-                operators = ["=="]  
+                operators = ["=="]
             else:
                 thresholds = uniq_vals
-                if len(thresholds) > 100: 
+                if len(thresholds) > 100:
                     thresholds = np.percentile(X_local[:, feat_idx], np.linspace(1, 99, 100))
                 operators = ["<="]
                 
             for thresh in thresholds:
                 for op in operators:
-                    score, _, _ = self._evaluate_rule(X_local, y_labels, m=1, conditions=[(feat_idx, thresh, op)], weights=local_weights)
+                    new_cond = (feat_idx, thresh, op)
+                    
+                    # La valutazione viene fatta sui dati estesi
+                    score, _, _ = self._evaluate_rule(X_extended, y_labels_extended, m=1, conditions=[new_cond], weights=local_weights)
                     if score < best_seed_score:
                         best_seed_score = score
-                        best_seed = (feat_idx, thresh, op)
-                        
+                        best_seed = new_cond
+                    
         if best_seed is None or best_seed_score == float('inf'):
             raise NoSplitFoundWarning("Nessun taglio valido trovato.")
                     
         self.m = 1
         self.conditions = [best_seed]
         current_score = best_seed_score
-        used_features = {best_seed[0]}
-        
-        if context is not None and hasattr(context, '_current_node') and context._current_node is not None:
-            for c in getattr(context._current_node, 'constraints', []):
-                used_features.add(c.feature_index)
-        
-        # 4. ESPANSIONE M-OF-N 
+        used_conditions = {best_seed}
+
+        # 4. ESPANSIONE M-OF-N (hill climbing)
         improved = True
+        
+        # se il seed migliore usa una feature già presente 
+        # in uno split disgiuntivo passato, viene vietata l'espansione. Lo split rimarrà 1-of-1.
+        if self.conditions[0][0] in forbidden_in_mofn:
+            improved = False
+            
         while improved and len(self.conditions) < self.max_conditions:
             improved = False
             best_cand_score = current_score
@@ -203,27 +225,32 @@ class MofNTrepanStumpClassifier(TrepanStumpClassifier):
             best_cand_cond = None
             
             for feat_idx in range(n_features):
-                if feat_idx in used_features: continue
+                # VIETIAMO di aggiungere feature della lista nera come nuove condizioni
+                if feat_idx in forbidden_in_mofn: 
+                    continue
                 
                 uniq_vals = np.unique(X_local[:, feat_idx])
-                is_categorical = len(uniq_vals) <= 10
+                is_categorical = self._is_feature_categorical(feat_idx, X_local, context)
                 
                 if is_categorical:
                     thresholds = uniq_vals
-                    operators = ["==", "!="]  
+                    operators = ["=="]
                 else:
                     thresholds = uniq_vals
-                    if len(thresholds) > 20: 
-                        thresholds = np.percentile(X_local[:, feat_idx], np.linspace(5, 95, 20))
-                    operators = ["<=", ">"]
+                    if len(thresholds) > 20:
+                        thresholds = np.percentile(X_local[:, feat_idx], np.linspace(20, 80, 15))
+                    operators = ["<="]
                     
                 for thresh in thresholds:
-                    for op in operators: 
+                    for op in operators:
                         new_cond = (feat_idx, thresh, op)
+                        if new_cond in used_conditions:
+                            continue
+
                         cand_conditions = self.conditions + [new_cond]
                         
-                        score_op1, _, _ = self._evaluate_rule(X_local, y_labels, self.m, cand_conditions, local_weights)
-                        score_op2, _, _ = self._evaluate_rule(X_local, y_labels, self.m + 1, cand_conditions, local_weights)
+                        score_op1, _, _ = self._evaluate_rule(X_extended, y_labels_extended, self.m, cand_conditions, local_weights)
+                        score_op2, _, _ = self._evaluate_rule(X_extended, y_labels_extended, self.m + 1, cand_conditions, local_weights)
                         
                         if score_op1 < (best_cand_score - 1e-6):
                             best_cand_score = score_op1
@@ -238,16 +265,15 @@ class MofNTrepanStumpClassifier(TrepanStumpClassifier):
             if best_cand_cond is not None:
                 self.m = best_cand_m
                 self.conditions.append(best_cand_cond)
-                used_features.add(best_cand_cond[0])
                 current_score = best_cand_score
+                used_conditions.add(best_cand_cond)
                 improved = True
                 
         # 5. CHIUSURA E ROUTING
-        _, left_mask, right_mask = self._evaluate_rule(X_local, y_labels, self.m, self.conditions, local_weights)
+        _, left_mask, right_mask = self._evaluate_rule(X_extended, y_labels_extended, self.m, self.conditions, local_weights)
         
-        # Sganciamo la predizione reale dal routing logico dell'albero RuleTree
-        self.left_class = 1   # ID Ramo Sinistro
-        self.right_class = 2  # ID Ramo Destro
+        self.left_class = 1
+        self.right_class = 2
         
         if weights_og is not None:
             n_parent = np.sum(local_weights)
@@ -264,6 +290,7 @@ class MofNTrepanStumpClassifier(TrepanStumpClassifier):
         
         class DummyTree:
             pass
+            
         self.tree_ = DummyTree()
         self.tree_.impurity = self.impurity
         self.tree_.feature = self.feature_original
@@ -271,12 +298,23 @@ class MofNTrepanStumpClassifier(TrepanStumpClassifier):
         self.tree_.weighted_n_node_samples = [n_parent, n_left, n_right]
         self.tree_.n_node_samples = [len(y_labels), np.sum(left_mask), np.sum(right_mask)]
         
-        # FIX Categoria per formattazione testuale regole
         if self.conditions:
             self.is_categorical = (self.conditions[0][2] in ["==", "!="])
         
         return self
+    
+    def _is_feature_categorical(self, feat_idx: int, X_local: np.ndarray, context) -> bool:
 
+
+        if context is not None and hasattr(context, 'categorical') and context.categorical is not None:
+
+           return feat_idx in context.categorical
+        else:
+           
+           uniq_vals = np.unique(X_local[:, feat_idx])
+           return len(uniq_vals) <= self.categorical_threshold
+    
+    
     def apply(self, X=None, X_ts=None, X_img=None, X_txt=None, idx=None, check_input=False):
         if idx is not None: 
             X = X[idx]
@@ -288,10 +326,10 @@ class MofNTrepanStumpClassifier(TrepanStumpClassifier):
             elif op == "!=": satisfied_counts += (X[:, feat_idx] != thresh).astype(int)
             else: satisfied_counts += (X[:, feat_idx] > thresh).astype(int)
                 
-        # Creiamo un array di 2 (Ramo Destro / Condizione Falsa)
+        # Crea un array di 2 (Ramo Destro / Condizione Falsa)
         y_pred = np.ones(X.shape[0]) * 2
         
-        # Sovrascriviamo con 1 (Ramo Sinistro / Condizione Vera) dove la regola M-of-N è rispettata
+        # Sovrascrive con 1 (Ramo Sinistro / Condizione Vera) dove la regola M-of-N è rispettata
         y_pred[satisfied_counts >= self.m] = 1
         
         return y_pred

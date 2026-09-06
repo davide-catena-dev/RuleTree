@@ -11,11 +11,13 @@ class SyntheticDataGenerator:
     Modella le distribuzioni marginali delle feature a partire da X_train
     e genera campioni rispettando vincoli (constraints) e regole m-of-n.
     """
-    def __init__(self, X_train: np.ndarray, random_state=None):
+    def __init__(self, X_train: np.ndarray, random_state=None, categorical_features: Optional[List[int]] = None):
         self.X_train = np.asarray(X_train)
         self.rng = check_random_state(random_state)
         self.n_features = self.X_train.shape[1]
-        
+        self.categorical_features = categorical_features
+
+        self.pool_factor = 20
         # Pre-calcola le distribuzioni per ogni feature
         self._precompute_distributions()
 
@@ -25,7 +27,11 @@ class SyntheticDataGenerator:
         for f in range(self.n_features):
             col = self.X_train[:, f].astype(float)
             uniq, counts = np.unique(col, return_counts=True)
-            is_cat = len(uniq) <= 10  # euristica
+
+            if self.categorical_features is not None and f in self.categorical_features:
+                is_cat = True
+            else:
+                is_cat = False
             
             kde = None
             if not is_cat and len(col) > 1:
@@ -48,7 +54,7 @@ class SyntheticDataGenerator:
                              min_bound: Optional[float] = None,
                              max_bound: Optional[float] = None) -> np.ndarray:
         """
-        Disegna n_samples per una singola feature, rispettando i bounds.
+        Estrae n_samples per una singola feature, rispettando i bounds.
         """
         info = self.feature_info[f_idx]
         col_data = self.X_train[:, f_idx]
@@ -146,24 +152,28 @@ class SyntheticDataGenerator:
         
         return samples[mask]
 
-    def generate(self, n_samples: int, 
-                 constraints: Optional[List[Constraint]] = None,
-                 m_of_n_rules: Optional[List[Tuple[int, List, bool]]] = None,
-                 return_all: bool = False) -> np.ndarray:
-        """
-        Genera n_samples sintetici rispettando constraints e m-of-n-rules.
+
+
+
+    def generate(
+    self,
+    n_samples: int,
+    constraints: Optional[List[Constraint]] = None,
+    m_of_n_rules: Optional[List[Tuple[int, List, bool]]] = None,
+    return_all: bool = False,
+    ) -> np.ndarray:
+        """Genera campioni sintetici rispettando constraints e m-of-n-rules.
         
-        Se dopo i filtri rimangono meno di n_samples, esegue un resampling 
-        con reinserimento per raggiungere esattamente n_samples.
-        Se return_all=True, restituisce TUTTI i campioni filtrati (senza riempimento).
+        Se non trova abbastanza campioni, restituisce TUTTI quelli
+        trovati (anche se meno di n_samples) oppure un array vuoto.
+        Non forza il riempimento con dati falsi.
         """
         constraints = constraints or []
         m_of_n_rules = m_of_n_rules or []
         
-        # 1. Calcola i bounds globali partendo dai vincoli
-        mins = np.array([info['min_val'] for info in self.feature_info])
-        maxs = np.array([info['max_val'] for info in self.feature_info])
-        
+        # Calcola i bounds globali
+        mins = np.array([info["min_val"] for info in self.feature_info])
+        maxs = np.array([info["max_val"] for info in self.feature_info])
         for c in constraints:
             f_idx = c.feature_index
             val = float(c.value)
@@ -175,55 +185,42 @@ class SyntheticDataGenerator:
                 mins[f_idx] = max(mins[f_idx], val)
                 maxs[f_idx] = min(maxs[f_idx], val)
         
-        # 2. Genera un pool iniziale (5x per avere abbastanza campioni dopo i filtri)
-        pool_size = n_samples * 5
+        # Genera un pool più grande per aumentare le probabilità di trovare campioni
+        pool_size = n_samples * self.pool_factor
         samples = np.zeros((pool_size, self.n_features))
         for f in range(self.n_features):
-            samples[:, f] = self._draw_feature_column(f, pool_size, mins[f], maxs[f])
+            samples[:, f] = self._draw_feature_column(
+                f, pool_size, mins[f], maxs[f]
+            )
         
-        # 3. Applica filtri (prima vincoli, poi m-of-n)
+        # Applica vincoli e regole m-of-n
         samples = self._apply_constraints(samples, constraints)
         samples = self._apply_m_of_n_rules(samples, m_of_n_rules)
         
-        # 4. Gestione del caso vuoto (FIX DEL BUG!)
-        if len(samples) == 0:
-            if return_all:
-                return np.empty((0, self.n_features))
-            # Se non return_all, riproviamo con un campionamento meno restrittivo:
-            # Generiamo uniformemente nella bounding box senza KDE per forzare la presenza
-            samples = np.zeros((n_samples, self.n_features))
-            for f in range(self.n_features):
-                samples[:, f] = self.rng.uniform(mins[f], maxs[f], size=n_samples)
-            # Riapplichiamo i filtri
-            samples = self._apply_constraints(samples, constraints)
-            samples = self._apply_m_of_n_rules(samples, m_of_n_rules)
-            
-            if len(samples) == 0 and not return_all:
-                # Ultima spiaggia: restituisci campioni che soddisfano solo i constraints (ignora m-of-n)
-                samples = np.zeros((n_samples, self.n_features))
-                for f in range(self.n_features):
-                    samples[:, f] = self.rng.uniform(mins[f], maxs[f], size=n_samples)
-                samples = self._apply_constraints(samples, constraints)
-                # Se ancora zero, prendi i centroidi
-                if len(samples) == 0:
-                    samples = np.tile((mins + maxs) / 2, (n_samples, 1))
-        
-        # 5. Tronca o riempie per avere esattamente n_samples
+        # Se return_all, restituisce TUTTI i sopravvissuti (anche zero)
         if return_all:
             return samples
         
+        # Altrimenti restituisce i primi n_samples, o TUTTI se sono meno
         if len(samples) >= n_samples:
             return samples[:n_samples]
         else:
-            # Resampling con reinserimento
-            indices = self.rng.choice(len(samples), size=n_samples, replace=True)
-            return samples[indices]
+            # Non forza il riempimento, restituisce solo i campioni validi (possono essere 0)".
+            # (possono essere 0)
+            return samples
         
-    def estimate_reach(self, constraints, m_of_n_rules, n_samples=1000):
-        """Stima la frazione di spazio che soddisfa i vincoli."""
-        samples = self.generate(n_samples, constraints, m_of_n_rules, return_all=True)
-        return len(samples) / float(n_samples)
     
-    def sample_constrained(self, n_samples, constraints, m_of_n_rules):  
-        """Alias per generate con return_all=False."""
-        return self.generate(n_samples, constraints, m_of_n_rules, return_all=False)
+       
+        
+        
+
+    
+    def estimate_reach(self, constraints, m_of_n_rules, n_samples=1000):
+      pool_size = n_samples * self.pool_factor  # deve corrispondere al pool_size usato in generate
+      samples = self.generate(n_samples, constraints, m_of_n_rules, return_all=True)
+      reach = len(samples) / float(pool_size)
+      return min(1.0, max(0.0, reach))
+    
+    def sample_constrained(self, n_samples, constraints, m_of_n_rules):
+       
+       return self.generate(n_samples, constraints, m_of_n_rules, return_all=False)

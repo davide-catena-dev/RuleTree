@@ -3,9 +3,10 @@ from sklearn.metrics import f1_score, accuracy_score, classification_report
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from RuleTree.tree.TrepanClassifier import Oracle, TrepanClassifier, TrepanNode
-from RuleTree.stumps.classification.TrepanStumpClassifier import TrepanStumpClassifier
 from RuleTree.stumps.classification.MofNTrepanStumpClassifier import MofNTrepanStumpClassifier
 import matplotlib
+
+from RuleTree.utils.feature_utils import detect_categorical_features
 matplotlib.use('Agg')
 from matplotlib import pyplot as plt
 #from RuleTree.tree.TrepanClassifier import Oracle
@@ -28,22 +29,30 @@ for m in colonne_con_mancanti:
     df[m] = df[m].fillna("Missing")
 
 
-
 le = LabelEncoder()
 binary = ['class','sex']
 df['class'] = df['class'].str.replace('.','',regex=False)
 for a in binary:
     df[a] = le.fit_transform(df[a])
-df = pd.get_dummies(df, drop_first=True, dtype=int)
+for col in df.select_dtypes(include=['object', 'category']).columns:
+    df[col] = df[col].astype(str) # Assicurati siano tutte stringhe
+    le = LabelEncoder()
+    df[col] = le.fit_transform(df[col])
 df.head()
+
 attributes = [col for col in df.columns if col != 'class']
 X = df[attributes].values
 y = df['class']
-
+categorical_features = detect_categorical_features(df[attributes])
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
 
-rd = RandomForestClassifier(n_estimators=20, random_state=42)
+from sklearn.utils.class_weight import compute_sample_weight
+# Calcola un array lungo quanto y_train, dove la classe 1 avrà un valore 
+# numerico più alto della classe 0 per compensare lo sbilanciamento.
+pesi_bilanciati = compute_sample_weight(class_weight='balanced', y=y_train)
+
+rd = RandomForestClassifier(n_estimators=200, random_state=42)
 rd.fit(X_train, y_train)
 y_test_pred = rd.predict(X_test)
 y_train_pred = rd.predict(X_train)
@@ -57,8 +66,8 @@ print('Test F1-score %s' % f1_score(y_test, y_test_pred, average=None))
 
 print(classification_report(y_test, y_test_pred))
 
-tr = TrepanClassifier(estimator=rd, max_depth=6, max_leaf_nodes=20, random_state=42, s_min=1000)
-tr.fit(X_train, y_train)
+tr = TrepanClassifier(estimator=rd,random_state=42, s_min=1000, categorical_features=categorical_features, max_internal_nodes=15)
+tr.fit(X_train, y_train, sample_weight=pesi_bilanciati)
 y_pred = tr.predict(X_test)
 
 
@@ -105,8 +114,8 @@ print(f'Contributions: {contributions[0]}')
 
 
 
-trm = TrepanClassifier(estimator=rd, max_depth=6, max_leaf_nodes=20, random_state=42, s_min=1000, base_stumps= MofNTrepanStumpClassifier())
-trm.fit(X_train, y_train)
+trm = TrepanClassifier(estimator=rd, max_leaf_nodes=20, random_state=42, categorical_features=categorical_features)
+trm.fit(X_train, y_train, sample_weight=pesi_bilanciati)
 y_pred = trm.predict(X_test)
 
 
@@ -163,7 +172,7 @@ param_grid = {
 # Passiamo una callable che invoca il RandomForest già addestrato `rd`.
 # In questo modo `sklearn.clone` non rimuove lo stato fitted e le copie
 # usate da GridSearch chiameranno comunque il `predict` del modello addestrato.
-tr_base = TrepanClassifier(estimator=(lambda X, _rd=rd: _rd.predict(X)), random_state=42)
+tr_base = TrepanClassifier(estimator=(lambda X, _rd=rd: _rd.predict(X)), categorical_features=categorical_features, random_state=42)
 
 def refit_complexity(results):
     scores = results["mean_test_score"]
@@ -215,7 +224,7 @@ oracle_y_train = rd.predict(X_train)
 
 # 5. Addestriamo la GridSearch puntando alla FEDELTÀ
 print("Avvio GridSearch per massimizzare la Fedeltà...")
-grid_search.fit(X_train, oracle_y_train)
+grid_search.fit(X_train, oracle_y_train, sample_weight=pesi_bilanciati)
 
 # 6. Risultati
 print("\n🏆 MIGLIORI PARAMETRI TROVATI:", grid_search.best_params_)
@@ -228,8 +237,7 @@ best_trepan = grid_search.best_estimator_
 y_test_oracle = rd.predict(X_test)
 best_pred = best_trepan.predict(X_test)
 fidelity_test = accuracy_score(y_test_oracle, best_pred)
-print("Fidelity finale su test: %.2f%%" % (fidelity_test * 100))
-best_trepan.print_trepan_rules(feature_names=attributes)
+#best_trepan.print_trepan_rules(feature_names=attributes)
 
 y_pred = best_trepan.predict(X_test)
 
@@ -238,3 +246,4 @@ y_pred = best_trepan.predict(X_test)
 print('Test Accuracy %s' % accuracy_score(y_test, y_pred))
 print('Test F1-score %s' % f1_score(y_test, y_pred, average=None))
 print(classification_report(y_test, y_pred))
+print("Fidelity finale su test: %.2f%%" % (fidelity_test * 100))
