@@ -467,26 +467,6 @@ class TrepanClassifier(RuleTreeClassifier):
         self._internal_nodes_count += 1
         return stump
 
-        
-    def _resolve_data_input(self, X=None, X_ts=None, X_img=None, X_txt=None):
-        self._validate_inputs(X=X, X_ts=X_ts, X_img=X_img, X_txt=X_txt)
-
-        if X is not None:
-            return X
-        if X_ts is not None:
-            return X_ts
-        if X_img is not None:
-            return X_img
-        if X_txt is not None:
-            return X_txt
-
-        raise ValueError("At least one of X, X_ts, X_img or X_txt must be specified.")
-    
-    def _compute_importances(self, current_node=None, importances=None):
-        return super()._compute_importances(current_node=current_node, importances=importances)
-    
-    def local_interpretation(self, X, joint_contribution=False):
-        return super().local_interpretation(X, joint_contribution)
     
     def queue_pop(self):
         
@@ -530,6 +510,8 @@ class TrepanClassifier(RuleTreeClassifier):
             n_step = max(10, int(n_step * 0.5))
             
         return n_init, n_step, n_max
+
+    
 
     def print_trepan_rules(self, feature_names=None, digits=3, scaler=None):
         """

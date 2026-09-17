@@ -16,32 +16,6 @@ class Constraint:
         self.operator = operator
         self.value = value
 
-    def satisfies(self, sample: np.ndarray) -> bool:
-        """
-        Controlla se un singolo campione soddisfa il vincolo.
-        sample deve essere un array 1D, dove sample[i] è il valore della feature i.
-        """
-        if self.feature_index < 0 or self.feature_index >= len(sample):
-            raise IndexError(f"feature_index {self.feature_index} out of bounds for sample of size {len(sample)}")
-
-        x = sample[self.feature_index]
-
-        if self.operator == "<=":
-            return x <= self.value
-        if self.operator == "<":
-            return x < self.value
-        if self.operator == ">=":
-            return x >= self.value
-        if self.operator == ">":
-            return x > self.value
-        if self.operator == "==":
-            return x == self.value
-        if self.operator == "!=":
-            return x != self.value
-        if self.operator == "in":
-            return x in self.value
-
-        raise ValueError(f"Unsupported operator: {self.operator}")
 
     def __repr__(self) -> str:
         return f"Constraint(feature={self.feature_index}, op={self.operator!r}, value={self.value!r})"
@@ -95,14 +69,6 @@ class TrepanNode(RuleTreeNode):
         """Priorità TREPAN: più reach, meno fidelity => più priorità."""
         return self.reach * (1.0 - self.fidelity)
 
-    def extend_constraints(self, new_constraints: Union[Constraint, Iterable[Constraint]]) -> None:
-        """
-        Aggiunge uno o più vincoli alla lista del nodo.
-        """
-        if isinstance(new_constraints, Constraint):
-            self.constraints.append(new_constraints)
-        else:
-            self.constraints.extend(list(new_constraints))
 
     def copy_constraints(self) -> list[Constraint]:
         """
@@ -111,42 +77,6 @@ class TrepanNode(RuleTreeNode):
         """
         return list(self.constraints)
 
-    def match_constraints(self, sample: np.ndarray) -> bool:
-        """
-        Controlla se un singolo campione soddisfa tutti i vincoli del nodo.
-        """
-        for constraint in self.constraints:
-            if not constraint.satisfies(sample):
-                return False
-        return True
-
-    def match_constraints_batch(self, X: np.ndarray) -> np.ndarray:
-        """
-        Controlla tutti i campioni in X e restituisce un array booleano.
-        """
-        return np.array([self.match_constraints(sample) for sample in X], dtype=bool)
-    
-    
-   
-    def satisfies_m_of_n_rules(self, sample: np.ndarray) -> bool:
-        """
-        Verifica se un campione rispetta tutte le regole M-of-N storiche 
-        ereditate dai nodi antenati lungo il percorso.
-        """
-        for m, conditions, is_left in self.m_of_n_rules:
-            satisfied_count = 0
-            for feat_idx, thresh, op in conditions:
-                val = sample[feat_idx]
-                if op == "<=": satisfied_count += int(val <= thresh)
-                elif op == "==": satisfied_count += int(val == thresh)
-                elif op == "!=": satisfied_count += int(val != thresh)
-                elif op == ">": satisfied_count += int(val > thresh)
-            
-            # Se is_left è True, il campione doveva soddisfare >= m condizioni
-            node_requirement = (satisfied_count >= m)
-            if node_requirement != is_left:
-                return False
-        return True
     
 
     def __lt__(self, other: object) -> bool:
@@ -170,25 +100,3 @@ class TrepanNode(RuleTreeNode):
         )
         
         
-    def make_child(self, new_constraint: Constraint) -> "TrepanNode":
-
-        """
-        Restituisce un nuovo nodo figlio
-        """
-        new_constraints = self.copy_constraints()
-        new_constraints.append(new_constraint)
-        child_m_of_n_rules = copy.deepcopy(getattr(self, 'm_of_n_rules', []))
-        
-        return TrepanNode(
-            node_id=f"{self.node_id}_child",
-            prediction=self.prediction,
-            prediction_probability=self.prediction_probability,
-            log_odds=self.log_odds,
-            classes=self.classes,
-            parent=self,
-            reach=self.reach,  # Il reach del figlio può essere calcolato successivamente
-            fidelity=self.fidelity,  # La fidelity del figlio può essere calcolata successivamente
-            constraints=new_constraints,
-            m_of_n_rules=child_m_of_n_rules
-        )
-    
