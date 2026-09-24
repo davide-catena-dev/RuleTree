@@ -1,1 +1,3 @@
 from .TrepanClassifier import TrepanClassifier
+from .TrepanNodeOptimized import TrepanNodeOptimized
+from .TrepanClassifierOptimized import TrepanNodeOptimized

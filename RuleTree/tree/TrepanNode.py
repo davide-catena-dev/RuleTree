@@ -1,7 +1,6 @@
 from typing import Optional, Iterable, Union
 import numpy as np
 from RuleTree.tree.RuleTreeNode import RuleTreeNode
-import copy
 
 class Constraint:
     """

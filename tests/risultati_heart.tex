@@ -1,0 +1,62 @@
+\documentclass{article}
+\usepackage[a4paper, left=1cm, right=2.5cm, top=2.5cm, bottom=2.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{makecell}
+
+\title{Risultati memoria}
+\author{Davide Catena}
+\date{September 2026}
+
+\begin{document}
+\maketitle
+
+\section{Heart-disease Dataset}
+
+\begin{table}[htbp]
+\raggedright
+\caption{Confronto TREPAN (originale e ottimizzato) e RuleTree base su Heart Disease al variare di \texttt{max\_internal\_nodes}. RuleTree usa \texttt{max\_leaf\_nodes = max\_internal\_nodes + 1}.}
+\label{tab:risultati}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{c l r r r r r r r r r}
+\toprule
+\makecell{Int.\\nodes} & Model & Acc. & Fid. & asizeof & deep & cpickle & Stumps & Leaves & Rules & Time \\
+ & & & & (KB) & (KB) & (KB) & & & & (s)  \\
+\midrule
+3 & Originale   & 0.754 & 0.885 & 15.180 & 13.984 & 4.067 & 3 & 4 & 12 & 0.215 \\
+3 & Ottimizzato & 0.754 & 0.885 & 12.789 & 11.844 & 3.000 & 3 & 4 & 6 & 0.774 \\
+3 & base        & 0.770 & 0.770 & 15.273 & 13.803 & 4.349 & 3 & 4 & 0 & 0.003 \\
+\midrule
+5 & Originale   & 0.754 & 0.885 & 22.328 & 20.436 & 6.034 & 5 & 6 & 30 & 0.514 \\
+5 & Ottimizzato & 0.754 & 0.885 & 18.516 & 17.014 & 4.362 & 5 & 6 & 10 & 0.485 \\
+5 & base        & 0.836 & 0.836 & 22.742 & 20.369 & 6.423 & 5 & 6 & 0 & 0.007 \\
+\midrule
+10 & Originale   & 0.803 & 0.934 & 36.742 & 33.438 & 10.060 & 9 & 10 & 76 & 0.541 \\
+10 & Ottimizzato & 0.803 & 0.934 & 30.023 & 27.391 & 7.253 & 9 & 10 & 18 & 0.550 \\
+10 & base        & 0.836 & 0.902 & 41.195 & 36.600 & 11.497 & 10 & 11 & 0 & 0.007 \\
+\midrule
+15 & Originale   & 0.820 & 0.951 & 54.602 & 49.586 & 15.235 & 14 & 15 & 176 & 0.657 \\
+15 & Ottimizzato & 0.820 & 0.951 & 43.969 & 39.969 & 10.671 & 14 & 15 & 28 & 0.659 \\
+15 & base        & 0.787 & 0.820 & 58.727 & 52.877 & 16.561 & 15 & 16 & 0 & 0.010 \\
+\midrule
+20 & Originale   & 0.820 & 0.951 & 68.945 & 62.574 & 19.456 & 18 & 19 & 264 & 0.726 \\
+20 & Ottimizzato & 0.820 & 0.951 & 55.156 & 50.070 & 13.446 & 18 & 19 & 36 & 0.737 \\
+20 & base        & 0.770 & 0.803 & 77.117 & 69.066 & 21.648 & 20 & 21 & 0 & 0.014 \\
+\midrule
+25 & Originale   & 0.820 & 0.951 & 79.773 & 72.398 & 22.688 & 21 & 22 & 340 & 0.815 \\
+25 & Ottimizzato & 0.820 & 0.951 & 63.586 & 57.691 & 15.546 & 21 & 22 & 42 & 0.833 \\
+25 & base        & 0.738 & 0.770 & 95.211 & 85.279 & 26.731 & 25 & 26 & 0 & 0.017 \\
+\midrule
+30 & Originale   & 0.820 & 0.951 & 79.773 & 72.398 & 22.688 & 21 & 22 & 340 & 0.825 \\
+30 & Ottimizzato & 0.820 & 0.951 & 63.586 & 57.691 & 15.546 & 21 & 22 & 42 & 0.804 \\
+30 & base        & 0.689 & 0.721 & 113.008 & 101.523 & 31.817 & 30 & 31 & 0 & 0.019 \\
+\midrule
+-- & Originale   & 0.820 & 0.951 & 79.773 & 72.398 & 22.688 & 21 & 22 & 340 & 0.770 \\
+-- & Ottimizzato & 0.820 & 0.951 & 63.586 & 57.691 & 15.546 & 21 & 22 & 42 & 0.786 \\
+-- & base        & 0.738 & 0.738 & 174.727 & 156.623 & 49.180 & 47 & 48 & 0 & 0.028 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\end{document}

@@ -1,0 +1,62 @@
+\documentclass{article}
+\usepackage[a4paper, left=1cm, right=2.5cm, top=2.5cm, bottom=2.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{makecell}
+
+\title{Risultati memoria}
+\author{Davide Catena}
+\date{September 2026}
+
+\begin{document}
+\maketitle
+
+\section{Splice-Junction Dataset}
+
+\begin{table}[htbp]
+\raggedright
+\caption{Confronto TREPAN (originale e ottimizzato) e RuleTree base su Splice Junction al variare di \texttt{max\_internal\_nodes}. RuleTree usa \texttt{max\_leaf\_nodes = max\_internal\_nodes + 1}.}
+\label{tab:risultati}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{c l r r r r r r r r r}
+\toprule
+\makecell{Int.\\nodes} & Model & Acc. & Fid. & asizeof & deep & cpickle & Stumps & Leaves & Rules & Time \\
+ & & & & (KB) & (KB) & (KB) & & & & (s)  \\
+\midrule
+3 & Originale   & 0.918 & 0.908 & 15.641 & 14.386 & 4.138 & 3 & 4 & 10 & 4.028 \\
+3 & Ottimizzato & 0.918 & 0.908 & 13.281 & 12.276 & 3.186 & 3 & 4 & 6 & 3.505 \\
+3 & base        & 0.719 & 0.713 & 25.430 & 23.826 & 5.080 & 3 & 4 & 0 & 0.040 \\
+\midrule
+5 & Originale   & 0.925 & 0.914 & 22.977 & 20.997 & 6.088 & 5 & 6 & 24 & 3.050 \\
+5 & Ottimizzato & 0.925 & 0.914 & 19.227 & 17.638 & 4.534 & 5 & 6 & 10 & 3.030 \\
+5 & base        & 0.729 & 0.719 & 32.344 & 30.479 & 7.241 & 5 & 6 & 0 & 0.039 \\
+\midrule
+10 & Originale   & 0.925 & 0.914 & 40.602 & 36.925 & 11.296 & 10 & 11 & 70 & 3.999 \\
+10 & Ottimizzato & 0.925 & 0.914 & 33.281 & 30.347 & 7.859 & 10 & 11 & 20 & 3.949 \\
+10 & base        & 0.893 & 0.884 & 49.648 & 47.131 & 12.547 & 10 & 11 & 0 & 0.055 \\
+\midrule
+15 & Originale   & 0.928 & 0.922 & 55.398 & 50.284 & 15.508 & 14 & 15 & 122 & 5.633 \\
+15 & Ottimizzato & 0.928 & 0.922 & 45.109 & 41.019 & 10.636 & 14 & 15 & 28 & 5.677 \\
+15 & base        & 0.920 & 0.904 & 66.930 & 63.766 & 17.887 & 15 & 16 & 0 & 0.069 \\
+\midrule
+20 & Originale   & 0.929 & 0.923 & 66.617 & 60.409 & 18.686 & 17 & 18 & 154 & 7.828 \\
+20 & Ottimizzato & 0.929 & 0.923 & 54.148 & 49.175 & 12.771 & 17 & 18 & 34 & 8.062 \\
+20 & base        & 0.925 & 0.909 & 84.172 & 80.377 & 23.204 & 20 & 21 & 0 & 0.068 \\
+\midrule
+25 & Originale   & 0.933 & 0.926 & 85.250 & 77.226 & 23.887 & 22 & 23 & 206 & 9.898 \\
+25 & Ottimizzato & 0.933 & 0.926 & 69.180 & 62.741 & 16.243 & 22 & 23 & 44 & 9.954 \\
+25 & base        & 0.942 & 0.925 & 101.414 & 96.992 & 28.523 & 25 & 26 & 0 & 0.080 \\
+\midrule
+30 & Originale   & 0.933 & 0.926 & 92.758 & 84.001 & 26.065 & 24 & 25 & 228 & 11.639 \\
+30 & Ottimizzato & 0.933 & 0.926 & 75.234 & 68.204 & 17.724 & 24 & 25 & 48 & 12.036 \\
+30 & base        & 0.937 & 0.920 & 118.648 & 113.609 & 33.824 & 30 & 31 & 0 & 0.078 \\
+\midrule
+-- & Originale   & 0.933 & 0.926 & 119.672 & 108.290 & 33.991 & 31 & 32 & 336 & 40.022 \\
+-- & Ottimizzato & 0.933 & 0.926 & 96.875 & 87.704 & 23.058 & 31 & 32 & 62 & 21.067 \\
+-- & base        & 0.937 & 0.923 & 426.352 & 409.639 & 128.436 & 119 & 120 & 0 & 0.161 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\end{document}

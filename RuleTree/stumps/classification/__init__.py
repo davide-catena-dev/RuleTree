@@ -6,4 +6,5 @@ from .PivotTreeStumpClassifier import PivotTreeStumpClassifier
 #from .ProximityTreeStumpClassifier import ProximityTreeStumpClassifier
 from .ShapeletTreeStumpClassifier import ShapeletTreeStumpClassifier
 from .PartialPivotTreeStumpClassifier import PartialPivotTreeStumpClassifier
+from .MofNTrepanStumpClassifierOptimized import MofNTrepanStumpClassifierOptimized
 from .MofNTrepanStumpClassifier import MofNTrepanStumpClassifier

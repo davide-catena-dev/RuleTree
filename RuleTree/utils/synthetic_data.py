@@ -57,7 +57,6 @@ class SyntheticDataGenerator:
         Estrae n_samples per una singola feature, rispettando i bounds.
         """
         info = self.feature_info[f_idx]
-        col_data = self.X_train[:, f_idx]
         
         # Fallback automatico se i bounds sono inconsistenti
         min_bound = max(min_bound, info['min_val']) if min_bound is not None else info['min_val']
@@ -216,6 +215,14 @@ class SyntheticDataGenerator:
 
     
     def estimate_reach(self, constraints, m_of_n_rules, n_samples=1000):
+      """
+      Stima la reach (copertura) di un nodo come rapporto tra campioni
+      sintetici sopravvissuti ai filtri e pool_size.
+          
+      NOTA: attualmente non è usato nel flusso TREPAN principale, che calcola
+      la reach sui dati reali in TrepanClassifier.prepare_node. È mantenuto
+      per eventuali usi futuri (es. stima della reach in assenza di dati reali).
+      """
       pool_size = n_samples * self.pool_factor  # deve corrispondere al pool_size usato in generate
       samples = self.generate(n_samples, constraints, m_of_n_rules, return_all=True)
       reach = len(samples) / float(pool_size)

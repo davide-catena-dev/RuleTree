@@ -1,18 +1,19 @@
 import heapq
 import numpy as np
-from typing import Any, Optional, Union
+from typing import Any, Optional
 import torch 
 from RuleTree.exceptions import NoSplitFoundWarning
-from RuleTree.stumps.classification import DecisionTreeStumpClassifier
 from RuleTree.tree.RuleTreeClassifier import RuleTreeClassifier
 from RuleTree.tree.RuleTreeNode import RuleTreeNode
-from RuleTree.tree.TrepanNode import TrepanNode, Constraint
-from RuleTree.stumps.classification.MofNTrepanStumpClassifier import MofNTrepanStumpClassifier
+from RuleTree.stumps.classification.MofNTrepanStumpClassifierOptimized import MofNTrepanStumpClassifierOptimized
 import scipy.stats
 from RuleTree.utils.synthetic_data import SyntheticDataGenerator
 from RuleTree.utils.feature_utils import detect_categorical_features
 from typing import Any, Optional
 import itertools
+from RuleTree.tree.TrepanNodeOptimized import TrepanNodeOptimized, Constraint
+from collections import namedtuple
+import warnings
 
 class Oracle:
     """Wrapper per interrogare diversi tipi di stimatori/oggetti.
@@ -78,7 +79,7 @@ class InternalPyTorchWrapper:
         return probs.cpu().numpy()
 
 
-class TrepanClassifier(RuleTreeClassifier):
+class TrepanClassifierOptimized(RuleTreeClassifier):
     def __init__(self,
                  estimator,
                  max_leaf_nodes=float('inf'),
@@ -98,7 +99,7 @@ class TrepanClassifier(RuleTreeClassifier):
                  max_internal_nodes=float('inf')):
         # se non inserisco altri stump, uso MofNTrepanStumpClassifier di default
         if base_stumps is None:
-            base_stumps = [MofNTrepanStumpClassifier()]
+            base_stumps = [MofNTrepanStumpClassifierOptimized()]
         # Se per caso passo uno stump singolo, lo inserisco in una lista
         elif not isinstance(base_stumps, list):
             base_stumps = [base_stumps]
@@ -153,12 +154,15 @@ class TrepanClassifier(RuleTreeClassifier):
         # Calcola numerical come complemento
         self.numerical = [i for i in range(X.shape[1]) if i not in self.categorical]
         # Mantiene un riferimento temporaneo durante l'esecuzione del fit di base
+
         self._X_train_temp = X
         self._total_samples = float(self._X_train_temp.shape[0]) if self._X_train_temp is not None else 1.0
+        self.classes_ = self.classes_ if hasattr(self, 'classes_') else np.unique(y)
         
 
         # Call base fit
         super().fit(X=X, y=y, X_ts=X_ts, X_img=X_img, X_txt=X_txt, sample_weight=sample_weight, **kwargs)
+    
 
         #Pulizia delle variabili temporanee
         self._X_train_temp = None
@@ -171,21 +175,32 @@ class TrepanClassifier(RuleTreeClassifier):
                      y: np.ndarray,
                      idx: np.ndarray,
                      node_id: str,
-                     node: Optional[TrepanNode] = None) -> TrepanNode:
+                     node: Optional[TrepanNodeOptimized] = None) -> TrepanNodeOptimized:
         
         # 1) PREVENZIONE CRASH DA DATI SINTETICI
         if idx is None or len(idx) == 0:
             parent_node = self._get_parent_dynamically(node_id)
             pred = getattr(parent_node, 'prediction', 0) if parent_node else 0
             
-            class DummyBase: pass
-            base_node = DummyBase()
-            base_node.node_id = node_id
-            base_node.prediction = pred
-            base_node.prediction_probability = getattr(parent_node, 'prediction_probability', np.array([1.0])) if parent_node else np.array([1.0])
-            base_node.log_odds = getattr(parent_node, 'log_odds', np.array([0.0])) if parent_node else np.array([0.0])
-            base_node.classes = getattr(parent_node, 'classes', np.unique(y)) if parent_node else np.unique(y)
-            setattr(base_node, "parent", parent_node)
+
+            new_node = TrepanNodeOptimized(
+            node_id=node_id,
+            prediction=pred,
+            prediction_probability=getattr(parent_node, 'prediction_probability', np.array([1.0])) if parent_node else np.array([1.0]),
+            log_odds=getattr(parent_node, 'log_odds', np.array([0.0])) if parent_node else np.array([0.0]),
+            classes=self.classes_,
+            parent=parent_node,
+            reach=0.0,
+            fidelity=1.0,
+            split_info=None,
+            is_statistically_pure=True,
+            stump=None,
+            node_l=None,
+            node_r=None,
+            )
+            return new_node
+
+
         else:
             if getattr(self, '_X_train_temp', None) is None: 
                raise RuntimeError("_X_train_temp non disponibile; chiamare fit() prima di prepare_node?")
@@ -196,21 +211,16 @@ class TrepanClassifier(RuleTreeClassifier):
                 y_for_base = y.copy()
                 y_for_base[idx] = y_oracle_local
             except Exception as e:
-                import warnings
                 warnings.warn(f"Oracle predict fallito in prepare_node: {e}. Uso etichette originali.")
                 y_for_base = y
             base_node = super().prepare_node(y_for_base, idx, node_id, node)
 
         # 2) CERTEZZA GEOMETRICA DEI CONSTRAINTS
-        node_constraints: list[Constraint] = []
-        node_m_of_n_rules = []
+        split_info = None
 
         if node_id is not None and len(str(node_id)) > 1:
             parent_node = self._get_parent_dynamically(node_id)
-            if parent_node is not None and isinstance(parent_node, TrepanNode):
-                node_constraints = parent_node.copy_constraints()
-                node_m_of_n_rules = list(getattr(parent_node, 'm_of_n_rules', []))
-
+            if parent_node is not None and isinstance(parent_node, TrepanNodeOptimized):
                 padre_stump = getattr(parent_node, "stump", None)
                 if padre_stump is not None:
                     is_left = str(node_id).endswith('l')
@@ -221,9 +231,9 @@ class TrepanClassifier(RuleTreeClassifier):
                     # Il ramo 'else' è mantenuto per compatibilità con stump univariati
                     # (es. DecisionTreeStumpClassifier), che producono una singola condizione
                     # rappresentabile come Constraint geometrico.
-                    if isinstance(padre_stump, MofNTrepanStumpClassifier):
+                    if isinstance(padre_stump, MofNTrepanStumpClassifierOptimized):
                         if len(padre_stump.conditions) > 0:
-                            node_m_of_n_rules.append((padre_stump.m, padre_stump.conditions, is_left))
+                            split_info = ('m_of_n', (padre_stump.m, padre_stump.conditions, is_left))
                     else:
                         feat_idx = padre_stump.feature_original[0]
                         thresh = padre_stump.threshold_original[0]
@@ -232,13 +242,11 @@ class TrepanClassifier(RuleTreeClassifier):
                             is_categorical = getattr(padre_stump, 'is_categorical', False)
                             op = "==" if is_categorical else "<="
                             
-                            if is_left:
-                                node_constraints.append(Constraint(feature_index=int(feat_idx),operator=op,value=float(thresh)))
-                            else:
-                                inverse_op = {"<=": ">", ">": "<=", "==": "!=", "!=": "==", "<": ">=", ">=": "<"}.get(op, "!=")
-                                
-                                node_constraints.append(Constraint(feature_index=int(feat_idx),operator=inverse_op,value=float(thresh)))
-
+                            if not is_left:
+                                op = {"<=": ">", ">": "<=", "==": "!=", "!=": "==", "<": ">=", ">=": "<"}.get(op, "!=")
+                            
+                            split_info = ('constraint', Constraint(feature_index=int(feat_idx), operator=op, value=float(thresh)))
+                
 
 
 
@@ -290,15 +298,34 @@ class TrepanClassifier(RuleTreeClassifier):
         # Caso 2: Pochi dati reali ma generatore disponibile
         elif idx is not None and len(idx) > 0:
             X_local = self._X_train_temp[idx]
-            
             local_gen = SyntheticDataGenerator(X_local, random_state=self.random_state,
                                        categorical_features=self.categorical)
             
             # Calcolo dinamico basato su s_min e reach
             safe_idx = idx if idx is not None else []
-            n_init, n_step, n_max = self._compute_sampling_params(safe_idx, reach, node_constraints, node_m_of_n_rules)
+
+
+            if node_id is not None and len(str(node_id)) > 1:
+                parent_node = self._get_parent_dynamically(node_id)
+                if isinstance(parent_node, TrepanNodeOptimized):
+                    inherited_constraints, inherited_rules = parent_node.get_split_data()
+                else:
+                    inherited_constraints, inherited_rules = [], []
+            else:
+                inherited_constraints, inherited_rules = [], []
+
+            if split_info is not None:
+                kind, data = split_info
+                if kind == 'constraint':
+                    inherited_constraints = inherited_constraints + [data]
+                elif kind == 'm_of_n':
+                    inherited_rules = inherited_rules + [data]
+
+
+
+            n_init, n_step, n_max = self._compute_sampling_params(safe_idx, reach, inherited_constraints, inherited_rules)
             
-            X_constrained = local_gen.sample_constrained(n_init, node_constraints, node_m_of_n_rules)
+            X_constrained = local_gen.sample_constrained(n_init, inherited_constraints, inherited_rules)
             
  
             if len(X_constrained) == 0:
@@ -315,7 +342,7 @@ class TrepanClassifier(RuleTreeClassifier):
                     if self._check_leaf_dominance(y_oracle_constrained):
                         break
 
-                    X_extra = local_gen.sample_constrained(n_step, node_constraints, node_m_of_n_rules)
+                    X_extra = local_gen.sample_constrained(n_step, inherited_constraints, inherited_rules)
                     if len(X_extra) == 0:
                         break
 
@@ -330,20 +357,19 @@ class TrepanClassifier(RuleTreeClassifier):
             fidelity = 1.0
             is_pure = True
         # 4) Ritorna il nodo e inietta il flag
-        new_node = TrepanNode(
+        new_node = TrepanNodeOptimized(
             node_id=base_node.node_id,
             prediction=base_node.prediction,
             prediction_probability=base_node.prediction_probability,
             log_odds=base_node.log_odds,
-            classes=base_node.classes,
+            classes=self.classes_,
             parent=getattr(base_node, "parent", None),
             reach=reach,
             fidelity=fidelity,
             stump=getattr(base_node, "stump", None),
             node_l=getattr(base_node, "node_l", None),
             node_r=getattr(base_node, "node_r", None),
-            constraints=node_constraints,
-            m_of_n_rules=node_m_of_n_rules,
+            split_info=split_info,
             is_statistically_pure=is_pure
         )
         
@@ -454,7 +480,7 @@ class TrepanClassifier(RuleTreeClassifier):
        current_node = getattr(self, '_current_node', None)
        return bool(getattr(current_node, 'is_statistically_pure', False))
 
-    def queue_push(self, node: TrepanNode, idx: np.ndarray):
+    def queue_push(self, node: TrepanNodeOptimized, idx: np.ndarray):
        
        if not hasattr(self, "queue"):
 
@@ -474,6 +500,7 @@ class TrepanClassifier(RuleTreeClassifier):
               raise NoSplitFoundWarning("Limite nodi interni raggiunto")
 
         stump = super().make_split(X, y, X_ts=X_ts, X_img=X_img, X_txt=X_txt, idx=idx, **kwargs)
+
         self._internal_nodes_count += 1
         return stump
 

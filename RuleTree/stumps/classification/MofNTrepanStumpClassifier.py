@@ -297,6 +297,8 @@ class MofNTrepanStumpClassifier(DecisionTreeStumpClassifier):
         self.tree_.threshold = self.threshold_original
         self.tree_.weighted_n_node_samples = [n_parent, n_left, n_right]
         self.tree_.n_node_samples = [len(y_labels), np.sum(left_mask), np.sum(right_mask)]
+
+        self._eval_cache = {}
         
         if self.conditions:
             self.is_categorical = (self.conditions[0][2] in ["==", "!="])
