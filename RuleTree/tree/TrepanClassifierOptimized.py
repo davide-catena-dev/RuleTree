@@ -550,7 +550,7 @@ class TrepanClassifierOptimized(RuleTreeClassifier):
 
     
 
-    def print_trepan_rules(self, feature_names=None, digits=3, scaler=None):
+    def print_trepan_rules(self, feature_names=None, scaled_columns = None, digits=3, scaler=None):
         """
         Stampa le regole globali estratte da TREPAN.
         
@@ -564,7 +564,11 @@ class TrepanClassifierOptimized(RuleTreeClassifier):
         print("  REGOLE GLOBALI ESTRATTE DA TREPAN")
         if scaler is not None:
             print("  (VALORI RISCALATI ALLA SCALA ORIGINALE)")
+            if scaled_columns is None:
+                scaled_columns=feature_names 
         print("="*70)
+
+
         
         if hasattr(self, 'opportunistic_node_map'):
             delattr(self, 'opportunistic_node_map')
@@ -574,14 +578,14 @@ class TrepanClassifierOptimized(RuleTreeClassifier):
             return
 
         # Funzione per riscalare un valore testuale al dataset
-        def rescale_rule_text(rule_text, feature_names, scaler):
+        def rescale_rule_text(rule_text, scaled_columns, scaler):
             import re
-            if scaler is None or feature_names is None:
+            if scaler is None or scaled_columns is None:
                 return rule_text
             
             # Ordina le feature dalla più lunga alla più corta per evitare che 
             # match parziali rovinino i nomi (es. "age" che intercetta "parent_age")
-            feature_names = list(feature_names)
+            feature_names = list(scaled_columns)
 
 
             sorted_features = sorted(feature_names, key=len, reverse=True)
@@ -628,13 +632,13 @@ class TrepanClassifierOptimized(RuleTreeClassifier):
                     if char == 'l':
                         rule_text = rule_dict.get('textual_rule', '')
                         if scaler is not None:
-                            rule_text = rescale_rule_text(rule_text, feature_names, scaler)
+                            rule_text = rescale_rule_text(rule_text, scaled_columns, scaler)
                         path_conditions.append("(" + rule_text + ")")
                         current_node = getattr(current_node, 'node_l', None)
                     elif char == 'r':
                         rule_text = rule_dict.get('not_textual_rule', '')
                         if scaler is not None:
-                            rule_text = rescale_rule_text(rule_text, feature_names, scaler)
+                            rule_text = rescale_rule_text(rule_text, scaled_columns, scaler)
                         path_conditions.append("(" + rule_text + ")")
                         current_node = getattr(current_node, 'node_r', None)
                 else:
