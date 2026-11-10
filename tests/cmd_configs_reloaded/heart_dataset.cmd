@@ -1,0 +1,17 @@
+get attributes examples/heart_dataset_example/heart_dataset.attr
+get attribute_values examples/heart_dataset_example/heart_dataset.attr.values
+get ontofilename libs/heart_dataset_ontology.owl
+get ontology examples/heart_dataset_example/heart_dataset.onto
+get training_examples examples/heart_dataset_example/heart_dataset.train.pat
+get test_examples examples/heart_dataset_example/heart_dataset.test.pat
+get network examples/heart_dataset_example/heart_dataset
+set use_ontology 0
+set seed 49
+set tree_size_limit 18
+set min_sample 5000
+lo_mofn examples/heart_dataset_example/heart_dataset.fidelity
+test_fidelity
+test_correctness
+draw_tree_revisited examples/heart_dataset_example/heart_dataset.dot
+print_rules examples/heart_dataset_example/heart_dataset.rules
+quit
