@@ -1,0 +1,107 @@
+\documentclass{article}
+\usepackage[a4paper, left=1cm, right=2.5cm, top=2.5cm, bottom=2.5cm]{geometry}
+\usepackage{booktabs}
+\usepackage{makecell}
+\usepackage{longtable} % Aggiunto per le tabelle multipagina
+
+\begin{document}
+
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+
+\begin{longtable}{c l r r r r r r r r}
+\caption{Confronto TREPAN Optimized, RuleTree base e CART su Heart Dataset al variare della complessità strutturale.}
+\label{tab:heart_struttura} \\
+\toprule
+\makecell{Max Int.\\Nodes} & Model & Acc. & Bal. Acc. & F1 Macro & Fid. & Stumps & Leaves & m-of-n Rules & Time (s) \\
+\midrule
+\endfirsthead
+
+\multicolumn{10}{c}%
+{{\bfseries \tablename\ \thetable{} -- Continua dalla pagina precedente}} \\
+\toprule
+\makecell{Max Int.\\Nodes} & Model & Acc. & Bal. Acc. & F1 Macro & Fid. & Stumps & Leaves & m-of-n Rules & Time (s) \\
+\midrule
+\endhead
+
+\midrule
+\multicolumn{10}{r}{{Continua nella pagina successiva...}} \\
+\endfoot
+
+\bottomrule
+\endlastfoot
+
+1 & CART        & 0.733 & 0.737 & 0.733 & 0.833 & 1 & 2 & 0 & 0.003 \\
+1 & RuleTree    & 0.733 & 0.737 & 0.733 & 0.833 & 1 & 2 & 0 & 0.002 \\
+1 & Trepan Opt  & 0.733 & 0.739 & 0.733 & 0.900 & 1 & 2 & 1 & 4.837 \\
+\midrule
+2 & CART        & 0.717 & 0.728 & 0.713 & 0.850 & 2 & 3 & 0 & 0.002 \\
+2 & RuleTree    & 0.717 & 0.728 & 0.713 & 0.850 & 2 & 3 & 0 & 0.002 \\
+2 & Trepan Opt  & 0.733 & 0.739 & 0.733 & 0.900 & 1 & 2 & 1 & 9.412 \\
+\midrule
+3 & CART        & 0.717 & 0.728 & 0.713 & 0.850 & 3 & 4 & 0 & 0.001 \\
+3 & RuleTree    & 0.717 & 0.728 & 0.713 & 0.850 & 3 & 4 & 0 & 0.003 \\
+3 & Trepan Opt  & 0.733 & 0.739 & 0.733 & 0.900 & 2 & 3 & 2 & 13.835 \\
+\midrule
+4 & CART        & 0.733 & 0.741 & 0.732 & 0.867 & 4 & 5 & 0 & 0.001 \\
+4 & RuleTree    & 0.717 & 0.725 & 0.715 & 0.883 & 4 & 5 & 0 & 0.003 \\
+4 & Trepan Opt  & 0.733 & 0.739 & 0.733 & 0.900 & 3 & 4 & 3 & 17.703 \\
+\midrule
+5 & CART        & 0.733 & 0.739 & 0.733 & 0.900 & 5 & 6 & 0 & 0.001 \\
+5 & RuleTree    & 0.717 & 0.725 & 0.715 & 0.883 & 5 & 6 & 0 & 0.005 \\
+5 & Trepan Opt  & 0.733 & 0.739 & 0.733 & 0.900 & 4 & 5 & 4 & 24.508 \\
+\midrule
+6 & CART        & 0.733 & 0.739 & 0.733 & 0.900 & 6 & 7 & 0 & 0.002 \\
+6 & RuleTree    & 0.733 & 0.739 & 0.733 & 0.900 & 6 & 7 & 0 & 0.005 \\
+6 & Trepan Opt  & 0.733 & 0.739 & 0.733 & 0.900 & 5 & 6 & 5 & 30.468 \\
+\midrule
+7 & CART        & 0.683 & 0.692 & 0.681 & 0.883 & 7 & 8 & 0 & 0.002 \\
+7 & RuleTree    & 0.733 & 0.739 & 0.733 & 0.900 & 7 & 8 & 0 & 0.006 \\
+7 & Trepan Opt  & 0.733 & 0.743 & 0.731 & 0.900 & 6 & 7 & 6 & 37.822 \\
+\midrule
+8 & CART        & 0.683 & 0.692 & 0.681 & 0.883 & 8 & 9 & 0 & 0.002 \\
+8 & RuleTree    & 0.733 & 0.739 & 0.733 & 0.900 & 8 & 9 & 0 & 0.006 \\
+8 & Trepan Opt  & 0.733 & 0.743 & 0.731 & 0.900 & 7 & 8 & 7 & 45.095 \\
+\midrule
+9 & CART        & 0.683 & 0.692 & 0.681 & 0.883 & 9 & 10 & 0 & 0.002 \\
+9 & RuleTree    & 0.733 & 0.739 & 0.733 & 0.900 & 9 & 10 & 0 & 0.007 \\
+9 & Trepan Opt  & 0.733 & 0.743 & 0.731 & 0.900 & 8 & 9 & 8 & 53.028 \\
+\midrule
+10 & CART        & 0.683 & 0.692 & 0.681 & 0.883 & 10 & 11 & 0 & 0.002 \\
+10 & RuleTree    & 0.683 & 0.692 & 0.681 & 0.883 & 10 & 11 & 0 & 0.008 \\
+10 & Trepan Opt  & 0.733 & 0.743 & 0.731 & 0.900 & 9 & 10 & 9 & 58.964 \\
+\midrule
+11 & CART        & 0.683 & 0.692 & 0.681 & 0.883 & 11 & 12 & 0 & 0.002 \\
+11 & RuleTree    & 0.683 & 0.692 & 0.681 & 0.883 & 11 & 12 & 0 & 0.007 \\
+11 & Trepan Opt  & 0.733 & 0.743 & 0.731 & 0.900 & 10 & 11 & 10 & 64.950 \\
+\midrule
+12 & CART        & 0.683 & 0.692 & 0.681 & 0.883 & 12 & 13 & 0 & 0.003 \\
+12 & RuleTree    & 0.683 & 0.692 & 0.681 & 0.883 & 12 & 13 & 0 & 0.008 \\
+12 & Trepan Opt  & 0.733 & 0.743 & 0.731 & 0.900 & 11 & 12 & 11 & 72.540 \\
+\midrule
+13 & CART        & 0.683 & 0.692 & 0.681 & 0.883 & 13 & 14 & 0 & 0.002 \\
+13 & RuleTree    & 0.683 & 0.692 & 0.681 & 0.883 & 13 & 14 & 0 & 0.009 \\
+13 & Trepan Opt  & 0.733 & 0.743 & 0.731 & 0.900 & 12 & 13 & 12 & 77.735 \\
+\midrule
+14 & CART        & 0.683 & 0.692 & 0.681 & 0.883 & 14 & 15 & 0 & 0.002 \\
+14 & RuleTree    & 0.683 & 0.692 & 0.681 & 0.883 & 14 & 15 & 0 & 0.011 \\
+14 & Trepan Opt  & 0.733 & 0.743 & 0.731 & 0.900 & 13 & 14 & 13 & 81.986 \\
+\midrule
+15 & CART        & 0.683 & 0.692 & 0.681 & 0.883 & 15 & 16 & 0 & 0.002 \\
+15 & RuleTree    & 0.683 & 0.692 & 0.681 & 0.883 & 15 & 16 & 0 & 0.009 \\
+15 & Trepan Opt  & 0.733 & 0.743 & 0.731 & 0.900 & 14 & 15 & 14 & 87.975 \\
+\midrule
+16 & CART        & 0.683 & 0.692 & 0.681 & 0.883 & 16 & 17 & 0 & 0.002 \\
+16 & RuleTree    & 0.683 & 0.692 & 0.681 & 0.883 & 16 & 17 & 0 & 0.010 \\
+16 & Trepan Opt  & 0.733 & 0.743 & 0.731 & 0.900 & 15 & 16 & 15 & 94.648 \\
+\midrule
+17 & CART        & 0.683 & 0.692 & 0.681 & 0.883 & 17 & 18 & 0 & 0.002 \\
+17 & RuleTree    & 0.683 & 0.692 & 0.681 & 0.883 & 17 & 18 & 0 & 0.011 \\
+17 & Trepan Opt  & 0.733 & 0.743 & 0.731 & 0.900 & 16 & 17 & 16 & 98.599 \\
+\midrule
+18 & CART        & 0.683 & 0.692 & 0.681 & 0.883 & 18 & 19 & 0 & 0.002 \\
+18 & RuleTree    & 0.683 & 0.692 & 0.681 & 0.883 & 18 & 19 & 0 & 0.012 \\
+18 & Trepan Opt  & 0.733 & 0.743 & 0.731 & 0.900 & 17 & 18 & 17 & 99.251 \\
+\end{longtable}
+
+\end{document}

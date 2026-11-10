@@ -1,0 +1,85 @@
+\documentclass{article}
+\usepackage[a4paper, left=1cm, right=2.5cm, top=2.5cm, bottom=2.5cm]{geometry}
+\usepackage{booktabs}
+\usepackage{makecell}
+\usepackage{longtable} % Aggiunto per le tabelle multipagina
+
+\begin{document}
+
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+
+\begin{longtable}{c l r r r r r r r r}
+\caption{Confronto TREPAN Optimized, RuleTree base e CART su Sonar Dataset al variare della complessità strutturale.}
+\label{tab:sonar_struttura} \\
+\toprule
+\makecell{Max Int.\\Nodes} & Model & Acc. & Bal. Acc. & F1 Macro & Fid. & Stumps & Leaves & m-of-n Rules & Time (s) \\
+\midrule
+\endfirsthead
+
+\multicolumn{10}{c}%
+{{\bfseries \tablename\ \thetable{} -- Continua dalla pagina precedente}} \\
+\toprule
+\makecell{Max Int.\\Nodes} & Model & Acc. & Bal. Acc. & F1 Macro & Fid. & Stumps & Leaves & m-of-n Rules & Time (s) \\
+\midrule
+\endhead
+
+\midrule
+\multicolumn{10}{r}{{Continua nella pagina successiva...}} \\
+\endfoot
+
+\bottomrule
+\endlastfoot
+
+1 & C (no onto) & -- & -- & -- & 0.707 & 1 & 2 & -- & -- \\
+1 & CART        & 0.805 & 0.790 & 0.795 & 0.878 & 1 & 2 & 0.000 & 0.004 \\
+1 & RuleTree    & 0.805 & 0.790 & 0.795 & 0.878 & 1 & 2 & 0.000 & 0.002 \\
+1 & nan         & 0.585 & 0.500 & 0.369 & 0.659 & 1 & 2 & 1.000 & 2.942 \\
+\midrule
+2 & C (no onto) & -- & -- & -- & 0.512 & 2 & 3 & -- & -- \\
+2 & CART        & 0.756 & 0.766 & 0.755 & 0.780 & 2 & 3 & 0.000 & 0.004 \\
+2 & RuleTree    & 0.829 & 0.803 & 0.813 & 0.854 & 2 & 3 & 0.000 & 0.003 \\
+2 & nan         & 0.780 & 0.735 & 0.741 & 0.854 & 2 & 3 & 2.000 & 8.379 \\
+\midrule
+3 & C (no onto) & -- & -- & -- & 0.512 & 3 & 4 & -- & -- \\
+3 & CART        & 0.780 & 0.778 & 0.776 & 0.756 & 3 & 4 & 0.000 & 0.003 \\
+3 & RuleTree    & 0.780 & 0.778 & 0.776 & 0.756 & 3 & 4 & 0.000 & 0.004 \\
+3 & nan         & 0.732 & 0.702 & 0.707 & 0.805 & 3 & 4 & 3.000 & 14.556 \\
+\midrule
+4 & C (no onto) & -- & -- & -- & 0.512 & 4 & 5 & -- & -- \\
+4 & CART        & 0.805 & 0.808 & 0.802 & 0.780 & 4 & 5 & 0.000 & 0.004 \\
+4 & RuleTree    & 0.780 & 0.778 & 0.776 & 0.756 & 4 & 5 & 0.000 & 0.006 \\
+4 & nan         & 0.732 & 0.702 & 0.707 & 0.805 & 4 & 5 & 4.000 & 17.423 \\
+\midrule
+5 & C (no onto) & -- & -- & -- & 0.585 & 5 & 6 & -- & -- \\
+5 & CART        & 0.854 & 0.832 & 0.842 & 0.878 & 5 & 6 & 0.000 & 0.005 \\
+5 & RuleTree    & 0.805 & 0.808 & 0.802 & 0.780 & 5 & 6 & 0.000 & 0.009 \\
+5 & nan         & 0.732 & 0.702 & 0.707 & 0.805 & 5 & 6 & 5.000 & 20.421 \\
+\midrule
+6 & C (no onto) & -- & -- & -- & 0.585 & 6 & 7 & -- & -- \\
+6 & CART        & 0.805 & 0.790 & 0.795 & 0.829 & 6 & 7 & 0.000 & 0.005 \\
+6 & RuleTree    & 0.756 & 0.766 & 0.755 & 0.732 & 6 & 7 & 0.000 & 0.007 \\
+6 & nan         & 0.756 & 0.732 & 0.737 & 0.829 & 6 & 7 & 6.000 & 23.076 \\
+\midrule
+7 & C (no onto) & -- & -- & -- & 0.585 & 7 & 8 & -- & -- \\
+7 & CART        & 0.805 & 0.790 & 0.795 & 0.829 & 7 & 8 & 0.000 & 0.004 \\
+7 & RuleTree    & 0.805 & 0.790 & 0.795 & 0.829 & 7 & 8 & 0.000 & 0.008 \\
+7 & nan         & 0.756 & 0.732 & 0.737 & 0.829 & 7 & 8 & 7.000 & 25.472 \\
+\midrule
+8 & C (no onto) & -- & -- & -- & 0.610 & 8 & 9 & -- & -- \\
+8 & CART        & 0.780 & 0.770 & 0.772 & 0.805 & 8 & 9 & 0.000 & 0.005 \\
+8 & RuleTree    & 0.805 & 0.790 & 0.795 & 0.829 & 8 & 9 & 0.000 & 0.009 \\
+8 & nan         & 0.683 & 0.669 & 0.670 & 0.756 & 8 & 9 & 8.000 & 28.425 \\
+\midrule
+9 & C (no onto) & -- & -- & -- & 0.634 & 9 & 10 & -- & -- \\
+9 & CART        & 0.780 & 0.770 & 0.772 & 0.805 & 9 & 10 & 0.000 & 0.005 \\
+9 & RuleTree    & 0.805 & 0.790 & 0.795 & 0.829 & 9 & 10 & 0.000 & 0.010 \\
+9 & nan         & 0.683 & 0.669 & 0.670 & 0.756 & 9 & 10 & 9.000 & 32.111 \\
+\midrule
+10 & C (no onto) & -- & -- & -- & 0.634 & 10 & 11 & -- & -- \\
+10 & CART        & 0.732 & 0.728 & 0.726 & 0.756 & 10 & 11 & 0.000 & 0.005 \\
+10 & RuleTree    & 0.805 & 0.790 & 0.795 & 0.829 & 10 & 11 & 0.000 & 0.011 \\
+10 & nan         & 0.683 & 0.669 & 0.670 & 0.756 & 10 & 11 & 10.000 & 34.539 \\
+\end{longtable}
+
+\end{document}
