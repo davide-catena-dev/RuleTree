@@ -3,8 +3,9 @@ get attribute_values examples/loan_dataset_example/loan_dataset.attr.values
 get training_examples examples/loan_dataset_example/loan_dataset.train.pat
 get test_examples examples/loan_dataset_example/loan_dataset.test.pat
 get network examples/loan_dataset_example/loan_dataset
-set seed 1
-set tree_size_limit 10
+set use_ontology 1
+set seed 9
+set tree_size_limit 6
 set min_sample 5000
 lo_mofn examples/loan_dataset_example/loan_dataset.fidelity
 test_fidelity
