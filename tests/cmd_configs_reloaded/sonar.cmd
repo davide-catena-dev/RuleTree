@@ -4,10 +4,10 @@ get ontology examples/sonar_example/sonar.onto
 get training_examples examples/sonar_example/sonar.train.pat
 get test_examples examples/sonar_example/sonar.test.pat
 get network examples/sonar_example/sonar
-set use_ontology 1
-set seed 10
+set use_ontology 0
+set seed 42
 set tree_size_limit 10
-set min_sample 5000
+set min_sample 200
 lo_mofn examples/sonar_example/sonar.fidelity
 test_fidelity
 test_correctness
