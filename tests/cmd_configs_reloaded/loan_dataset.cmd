@@ -1,7 +1,5 @@
 get attributes examples/loan_dataset_example/loan_dataset.attr
 get attribute_values examples/loan_dataset_example/loan_dataset.attr.values
-get ontofilename libs/loan_dataset_ontology.owl
-get ontology examples/loan_dataset_example/loan_dataset.onto
 get training_examples examples/loan_dataset_example/loan_dataset.train.pat
 get test_examples examples/loan_dataset_example/loan_dataset.test.pat
 get network examples/loan_dataset_example/loan_dataset
